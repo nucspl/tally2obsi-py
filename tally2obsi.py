@@ -3,6 +3,8 @@
 import os, re, sqlite3, subprocess
 from datetime import datetime, timezone
 
+print ('Conversion start.')
+
 fdir = f'{os.path.dirname (os.path.abspath (__file__))}{os.path.sep}'
 scon = sqlite3.connect (f'{fdir}NotallyDatabase')
 scur = scon.cursor()
@@ -58,4 +60,4 @@ for row in scur.execute ('''SELECT * FROM BaseNote ORDER BY timestamp'''):
 	scons (f'(Get-Item "{path}").CreationTime = (Get-Date "{ustam (timestamp, True)}")')
 
 scon.close()
-print ('Export complete!')
+print ('Conversion complete!')
