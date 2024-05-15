@@ -62,6 +62,7 @@ for z in range (indices):
 		i = 0
 	preceedingTimestamp = currentTimestamp
 
+	# if file has title, use it; if none, omit
 	if currentTitle != '':
 		filename = f"{prefix} – {currentTitle}. {currentTimestamp}"
 	else:
@@ -69,8 +70,10 @@ for z in range (indices):
 	
 	filepath = f"{pyDirectory}{purify (filename)}.md"
 
+	# show progress
 	print (f"Writing {filepath}...")
 
+	# create file; if list, write currentBody from currentItems
 	with open (filepath, 'w', encoding = 'utf-8') as file:
 		if currentType == "LIST":
 			currentItems = json.loads (currentItems)
@@ -78,6 +81,7 @@ for z in range (indices):
 				currentBody += f"{enlist (item["body"], item["checked"])}\n"
 		file.write (currentBody.strip())
 
+	# update NTFS file creation timestamp, windows
 	system (f'(Get-Item "{filepath}").CreationTime = (Get-Date "{chrono (currentTimestamp, True)}")')
 
 print ("No more rows retrievable; conversion complete!")
