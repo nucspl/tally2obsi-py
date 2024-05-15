@@ -9,7 +9,7 @@ A script to make migrating Notally notes to Obsidian possible!
 ## Usage
 Just throw the source file and your 'NotallyDatabase' file into a folder (preferrably a new, temporary one), then run the script with Python. As shrimple as that!
 
-![image](https://github.com/nucspl/tally2obsi-py/assets/80261260/156f62df-1898-49e0-b796-65279bd63c15)
+![image](https://github.com/nucspl/tally2obsi-py/assets/80261260/8f480eed-926b-49b4-af0e-92e26d23bcd4)
 
 ## Questions
 ### Why bother making this?
