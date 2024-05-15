@@ -3,61 +3,70 @@
 import os, re, sqlite3, subprocess
 from datetime import datetime, timezone
 
-print ('Conversion start.')
+# process start
 
-fdir = f'{os.path.dirname (os.path.abspath (__file__))}{os.path.sep}'
-scon = sqlite3.connect (f'{fdir}NotallyDatabase')
-scur = scon.cursor()
+print ("Starting conversion.")
 
-def sstri (directory, substring):
-	for filename in os.listdir (directory):
-		if substring in filename:
-			return True
-	return False
+pyDirectory = f"{os.path.dirname (os.path.abspath (__file__))}{os.path.sep}"
+sqlConnect = sqlite3.connect (f"{pyDirectory}NotallyDatabase")
+sqlCursor = sqlConnect.cursor()
 
-def ustam (unixtime, formatted):
-	local = datetime.fromtimestamp (unixtime / 1000.0, tz = timezone.utc)
-	
+# converts unix time to windows-parsable or human-readable time
+def chrono (unixtime, formatted):
+	stamp = datetime.fromtimestamp (unixtime / 1000.0)
+
 	if formatted:
-		human = local.strftime ('%Y-%m-%d %H:%M:%S.%f')[:-3]
+		return stamp.strftime ("%Y-%m-%d %H:%M:%S.%f")[:-3]
 	else:
-		human = local.strftime ('%Y%m%d')
-		
-	return human
+		return stamp.strftime ("%Y%m%d")
 
-def scons (command):
+# calls a system terminal to execute commands, windows
+def system (command):
 	subprocess.run (['powershell', '-Command', command], shell = True)
 
-def nclea (string):
+# purifies note title if invalid as NTFS file name
+def purify (string):
 	evils = re.compile (r'[<>:"/\\|?*\x00-\x1F]')
-	clean = evils.sub ('_', string)
-	return clean
+	return evils.sub ('_', string)
 
-i = 1
-for row in scur.execute ('''SELECT * FROM BaseNote ORDER BY timestamp'''):
-	id, type, folder, color, title, pinned, timestamp, labels, body, spans, items, images = row
+# retrieve number of notes
+sqlCursor.execute ("""SELECT COUNT(*) FROM 'BaseNote' WHERE folder != 'DELETED' AND type != 'LIST'""") # skip deleted, lists to be done later
+indices = sqlCursor.fetchone()[0]
 
-	if folder == 'DELETED' or type == 'LIST': # lists are weirdly implemented, won't bother for now
-		continue
+i = 0 # same-day note iteration
+preceedingTimestamp = None # same-day note comparison
+for z in range (indices):
+	# retrieve current row
+	sqlCursor.execute ("""SELECT * FROM 'BaseNote' WHERE folder != 'DELETED' AND type != 'LIST' ORDER BY timestamp LIMIT ?, 1""", (z,))
+	currentId, currentType, currentFolder, currentColor, currentTitle, currentPinned, currentTimestamp, currentLabels, currentBody, currentSpans, currentItems, currentImages = sqlCursor.fetchone()
 
-	if sstri (fdir, ustam (timestamp, False)):
-		stamp = f'{ustam (timestamp, False)} {str (i).zfill (2)}'
+	# retrieve succeeding row unless final
+	if z < indices - 1: # -1 because range() counts from 0, as it should
+		sqlCursor.execute ("""SELECT * FROM 'BaseNote' WHERE folder != 'DELETED' AND type != 'LIST' ORDER BY timestamp LIMIT ?, 1""", (z + 1,))
+		succeedingId, succeedingType, succeedingFolder, succeedingColor, succeedingTitle, succeedingPinned, succeedingTimestamp, succeedingLabels, succeedingBody, succeedingSpans, succeedingItems, succeedingImages = sqlCursor.fetchone()
+
+	# check if succeeding or preceeding notes were made on the same day
+	if chrono (currentTimestamp, False) == chrono (succeedingTimestamp, False) or chrono (currentTimestamp, False) == chrono (preceedingTimestamp, False):
+		prefix = f"{chrono (currentTimestamp, False)} {str(i).zfill(2)}"
 		i += 1
 	else:
-		stamp = ustam (timestamp, False)
-		i = 1
-	
-	if title != '':
-		name = f'{stamp} – {title}. {timestamp}'.strip()
+		prefix = chrono (currentTimestamp, False)
+		i = 0
+	preceedingTimestamp = currentTimestamp
+
+	if currentTitle != '':
+		filename = f"{prefix} – {currentTitle}. {currentTimestamp}"
 	else:
-		name = f'{stamp} – {timestamp}'.strip()
+		filename = f"{prefix} – {currentTimestamp}"
 	
-	path = f'{fdir}{nclea (name)}.md'
+	filepath = f"{pyDirectory}{purify (filename)}.md"
 
-	with open (path, 'w', encoding = 'utf-8') as file:
-		file.write (body)
-	
-	scons (f'(Get-Item "{path}").CreationTime = (Get-Date "{ustam (timestamp, True)}")')
+	print (f"Writing {filepath}...")
 
-scon.close()
-print ('Conversion complete!')
+	with open (filepath, 'w', encoding = 'utf-8') as file:
+		file.write (currentBody)
+
+	system (f'(Get-Item "{filepath}").CreationTime = (Get-Date "{chrono (currentTimestamp, True)}")')
+
+print ("No more rows retrievable; conversion complete!")
+sqlConnect.close()
