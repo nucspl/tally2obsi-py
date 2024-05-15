@@ -81,8 +81,8 @@ for z in range (indices):
 				currentBody += f"{enlist (item["body"], item["checked"])}\n"
 		file.write (currentBody.strip())
 
-	# update NTFS file creation timestamp, windows
-	system (f'(Get-Item "{filepath}").CreationTime = (Get-Date "{chrono (currentTimestamp, True)}")')
+		# update NTFS file creation timestamp, windows // unreliable if not under with
+		system (f'(Get-Item "{filepath}").CreationTime = (Get-Date "{chrono (currentTimestamp, True)}")')
 
 print ("No more rows retrievable; conversion complete!")
 sqlConnect.close()
