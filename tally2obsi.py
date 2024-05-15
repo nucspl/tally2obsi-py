@@ -1,6 +1,6 @@
 # tally2obsi-py — Porting Notally notes to Obsidian with regard to creation timestamps.
 
-import os, re, sqlite3, subprocess
+import json, os, re, sqlite3, subprocess
 from datetime import datetime, timezone
 
 # process start
@@ -20,6 +20,14 @@ def chrono (unixtime, formatted):
 	else:
 		return stamp.strftime ("%Y%m%d")
 
+# converts list json arrays
+def enlist (string, state):
+	if state:
+		state = "- [x]"
+	else:
+		state = "- [ ]"
+	return f"{state} {string}"
+
 # calls a system terminal to execute commands, windows
 def system (command):
 	subprocess.run (['powershell', '-Command', command], shell = True)
@@ -30,19 +38,19 @@ def purify (string):
 	return evils.sub ('_', string)
 
 # retrieve number of notes
-sqlCursor.execute ("""SELECT COUNT(*) FROM 'BaseNote' WHERE folder != 'DELETED' AND type != 'LIST'""") # skip deleted, lists to be done later
+sqlCursor.execute ("""SELECT COUNT(*) FROM 'BaseNote' WHERE folder != 'DELETED'""") # skip deleted, lists to be done later
 indices = sqlCursor.fetchone()[0]
 
 i = 0 # same-day note iteration
 preceedingTimestamp = None # same-day note comparison
 for z in range (indices):
 	# retrieve current row
-	sqlCursor.execute ("""SELECT * FROM 'BaseNote' WHERE folder != 'DELETED' AND type != 'LIST' ORDER BY timestamp LIMIT ?, 1""", (z,))
+	sqlCursor.execute ("""SELECT * FROM 'BaseNote' WHERE folder != 'DELETED' ORDER BY timestamp LIMIT ?, 1""", (z,))
 	currentId, currentType, currentFolder, currentColor, currentTitle, currentPinned, currentTimestamp, currentLabels, currentBody, currentSpans, currentItems, currentImages = sqlCursor.fetchone()
 
 	# retrieve succeeding row unless final
 	if z < indices - 1: # -1 because range() counts from 0, as it should
-		sqlCursor.execute ("""SELECT * FROM 'BaseNote' WHERE folder != 'DELETED' AND type != 'LIST' ORDER BY timestamp LIMIT ?, 1""", (z + 1,))
+		sqlCursor.execute ("""SELECT * FROM 'BaseNote' WHERE folder != 'DELETED' ORDER BY timestamp LIMIT ?, 1""", (z + 1,))
 		succeedingId, succeedingType, succeedingFolder, succeedingColor, succeedingTitle, succeedingPinned, succeedingTimestamp, succeedingLabels, succeedingBody, succeedingSpans, succeedingItems, succeedingImages = sqlCursor.fetchone()
 
 	# check if succeeding or preceeding notes were made on the same day
@@ -64,7 +72,11 @@ for z in range (indices):
 	print (f"Writing {filepath}...")
 
 	with open (filepath, 'w', encoding = 'utf-8') as file:
-		file.write (currentBody)
+		if currentType == "LIST":
+			currentItems = json.loads (currentItems)
+			for item in currentItems:
+				currentBody += f"{enlist (item["body"], item["checked"])}\n"
+		file.write (currentBody.strip())
 
 	system (f'(Get-Item "{filepath}").CreationTime = (Get-Date "{chrono (currentTimestamp, True)}")')
 
